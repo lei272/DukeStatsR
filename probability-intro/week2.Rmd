@@ -242,7 +242,7 @@ this data frame as `sfo_feb_flights`. How many flights meet these criteria?
 
 ```{r sfo-feb-flights}
 # type your code for Question 1 here, and Knit
-
+str(sfo_feb_flights)
 ```
 
 
@@ -258,7 +258,8 @@ delays of `sfo_feb_flights`. Which of the following is false?
 
 ```{r sfo-feb-flights-arrival-delays}
 # type your code for Question 2 here, and Knit
-
+ggplot(data = sfo_feb_flights, aes(x = arr_delay)) +
+  geom_histogram()
 ```
 
 Another useful functionality is being able to quickly calculate summary 
@@ -288,7 +289,9 @@ IQR of arrival delays?
 
 ```{r sfo-feb-flights-arrival-delays-carrier}
 # type your code for Question 3 here, and Knit
-
+sfo_feb_flights %>%
+  group_by(carrier) %>%
+  summarise(IQR_dd = IQR(arr_delay), n = n())
 ```
 
 ### Departure delays over months
@@ -337,7 +340,10 @@ nycflights %>%
 
 ```{r highest-median-dep-delay-month}
 # type your code for Question 5 here, and Knit
-
+nycflights %>%
+  group_by(month) %>%
+  summarise(median_dd = median(dep_delay)) %>%
+  arrange(desc(median_dd))
 ```
 
 
@@ -409,7 +415,7 @@ nycflights %>%
   arrange(desc(ot_dep_rate))
 ```
 
-**The summarise step is telling R to count up how many records of the currently found group are on time - sum(dep_type == "on time”) - and divide that result by the total number of elements in the currently found group - n() - to get a proportion, then to store the answer in a new variable called ot_dep_rate.**
+**The summarise step is telling R to count up how many records of the currently found group are on time - sum(dep_type == "on time???) - and divide that result by the total number of elements in the currently found group - n() - to get a proportion, then to store the answer in a new variable called ot_dep_rate.**
 
 7.  If you were selecting an airport simply based on on time departure percentage, 
 which NYC airport would you choose to fly out of? 
@@ -450,7 +456,10 @@ Google this tail number to find out more about the aircraft.
 
 ```{r fastest-avg-speed-tailnum}
 # type your code for Question 8 here, and Knit
-
+nycflights %>%
+  mutate(avg_speed = distance / air_time * 60) %>%
+  arrange(desc(avg_speed)) %>%
+  select(avg_speed, tailnum)
 ```
 
 
@@ -466,7 +475,10 @@ about the relationship between average speed and distance.
 
 ```{r avg-speed-dist-scatter}
 # type your code for Question 9 here, and Knit
-
+nycflights <- nycflights %>%
+  mutate(avg_speed = distance / air_time * 60)
+ggplot(data = nycflights, aes(x = distance, y = avg_speed)) +
+  geom_point()
 ```
 
 
@@ -480,5 +492,7 @@ were `"delayed"` departing arrive `"on time"`?
 
 ```{r on-time-arr-perc}
 # type your code for Question 9 here, and Knit
-
+nycflights <- nycflights %>%
+  mutate(arr_type = ifelse(arr_delay <= 0, 1, 0))
+mean(nycflights$arr_type)
 ```
