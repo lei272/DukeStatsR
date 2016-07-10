@@ -108,7 +108,12 @@ home sales.
 </div>
 ```{r samp1-dist}
 # type your code for the Exercise here, and Run Document
-
+samp1 %>%
+  summarise(x_bar = mean(area), samp_med = median(area), 
+            sd = sd(area), samp_iqr = IQR(area),
+            samp_min = min(area), samp_max = max(area),
+            samp_q1 = quantile(area, 0.25),  # first quartile, 25th percentile
+            samp_q3 = quantile(area, 0.75))  # third quartile, 75th percentile
 ```
 
 
@@ -200,7 +205,8 @@ Note that for each of the 15,000 times we computed a mean, we did so from a
 </div>
 ```{r practice-sampling-dist}
 # type your code for the Exercise here, and Run Document
-
+sample_mean_small <- ames %>%
+                    rep_sample_n(size = 10, reps = 25, replace = TRUE)
 ```
 
 3. How many elements are there in this object called `sample_means_small`? 
