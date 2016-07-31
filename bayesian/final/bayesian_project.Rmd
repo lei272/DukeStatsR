@@ -1,0 +1,152 @@
+---
+title: "Bayesian modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(statsr)
+library(BAS)
+```
+
+### Load data
+
+```{r load-data}
+setwd('/Users/linghao/dukeR/linear-regression-model/final')
+load('movies.Rdata')
+```
+
+* * *
+
+## Part 1: Data
+
+### Overview of Data
+
+The dataset `movies` is comprised of 651 randomly sampled movies produced and released before 2016, including information from both **Rotten Tomatoes** and **IMDb**.
+
+### Scope of Inference
+
+The dataset should be considered as the result of an **retrospective observational study** that uses a **random sampling** approach to obtain a representative sample from U.S. movies. Since random sampling method is applied in data collection, **the results should be generalizable** to the target population.
+
+Note that observational studies only reveal associations. In data analysis, **association does not imply causation**. Causation can only be inferred from a randomized experiment. **This study does not meet the requirements of such an experiment.** 
+
+### Sources of Bias
+
+- “Face-to-face interviews” performed at the University of Chicago can introduces **convenience bias** as people living in or close to Chicago are be more likely to participate.
+
+- The study may suffer from **voluntary response bias** since people with strong responses are more likely to participate. The voluntary participants may not be representative of the U.S. population.
+
+* * *
+
+## Part 2: Data manipulation
+
+Five new variables are created according to the instruction.
+
+```{r create-new-variables}
+movies <- mutate(movies, feature_film=as.factor(ifelse(title_type=='Feature Film', 'yes', 'no')))
+movies <- mutate(movies, drama=as.factor(ifelse(genre=='Drama', 'yes', 'no')))
+movies <- mutate(movies, mpaa_rating_R=as.factor(ifelse(mpaa_rating=='R', 'yes', 'no')))
+movies <- mutate(movies, oscar_season=as.factor(ifelse(thtr_rel_month %in% c(10, 11, 12), 'yes', 'no')))
+movies <- mutate(movies, summer_season=as.factor(ifelse(thtr_rel_month %in% c(5, 6, 7, 8), 'yes', 'no')))
+```
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+Since the response variable here is always `audience_score`, we expect to see the same scale for y-axis. Therefore we can use `gather` function from `tidyr` package to **stack all 5 newly created variable into a single column**.
+
+```{r gather-data}
+movies_gathered <- gather(movies, 'variable', 'flag', 33:37)
+```
+
+Then we create a side-by-side boxplot.
+
+```{r boxplot-by-variable}
+ggplot(movies_gathered, aes(x=variable, y=audience_score, fill=flag)) + geom_boxplot()
+```
+
+Also the numerical summary statistics.
+
+```{r summary-stats}
+movies_gathered %>%
+  group_by(variable, flag) %>%
+  summarise(mean=mean(audience_score), median=median(audience_score), min=min(audience_score), max=max(audience_score), IQR=IQR(audience_score))
+```
+
+From the plot and the summary, it's clear that **drama movies tend to have higher scores than other genres**. And that **feature films have much lower scores than non-feature films**. Other variables, however, do not seem to have any significant impact on scores.
+
+* * *
+
+## Part 4: Modeling
+
+Let's now perform Bayesian model averaing.
+
+```{r bas-model}
+model <- bas.lm(data=na.omit(movies), audience_score ~ feature_film + drama + runtime + mpaa_rating_R
+               + thtr_rel_year + oscar_season + summer_season + imdb_rating + imdb_num_votes
+               + critics_score + best_pic_nom + best_pic_win + best_actor_win + best_actress_win
+               + best_dir_win + top200_box, prior = 'BIC', modelprior = uniform())
+```
+
+Let's print out marginal posterior inclusion probability for each variable.
+
+```{r inspect-variables}
+model
+```
+
+We can see that `imdb_rating` has a posterior inclusion probability of 1.00, which sounds quite logical in the context of movie industry. Besides `critics_score` and `runtime` also have pretty high probabilities.
+
+Then let's see the summary of models.
+
+```{r inspect-models}
+summary(model)
+```
+
+We see that the best model is consisted of `Intercept`, `runtime`, `imdb_rating` and `critics_score`, which is consistent with the findings above.
+
+Let's now fit the best model and interpret it's coefficients.
+
+```{r fit-best-model}
+final_model <- lm(data=na.omit(movies), audience_score ~ imdb_rating + critics_score + runtime)
+final_model
+```
+
+We see that `imdb_rating` has a coefficient of `14.95`, meaning that for each additional score on `imdb_rating`, we expect `audience_score` to be higher by `14.95`. Since IMDB score is given on a scale of 0 to 10 and `audience_score` is given on a scale of 0 to 100, as well as taking `Intercept = -32.90` into account, it makes perfect sense.
+
+Similarly, for each additional score on `critics_score`, we expect `audience_score` to be higher by `0.075`. Obviously this is not as impacting as `imdb_rating`.
+
+Finally, for each additional minute of a movie's running time, we expect to see a decrese of `0.058` in `audience_score`. This means that in general people don't like lengthy movies. Note that the IQR for `runtime` is `23.8` minutes, which means that for most movies the different in `runtime` only contributes to no more than `2` points in `audience_score`.
+
+* * *
+
+## Part 5: Prediction
+
+We now use our final model to predict the audience score of *X-MEN: Apocalypse*. Information about this film can be found at [http://www.imdb.com/title/tt3385516/](http://www.imdb.com/title/tt3385516/) and [https://www.rottentomatoes.com/m/x_men_apocalypse](https://www.rottentomatoes.com/m/x_men_apocalypse)
+
+```{r predict-new-movie}
+new_movie <- data.frame(runtime=144, imdb_rating=7.3, critics_score=48)
+predict(final_model, new_movie)
+```
+
+The model predicted a `71.5` audience score, which is suprisingly close to the true value `71`.
+
+* * *
+
+## Part 6: Conclusion
+
+The fact that `imdb_rating` has the highest posterior probability, and that two of our five newly created variables which seem to have predictive power are not included in the best model, is quite disappointing. Because **IMDB ratings are somewhat in sync with audience scores and thus are very useless as leading predictors**. The same applies to `critics_score`.
+
+Nevertheless, we do have some insights that might turn out to be useful. Drame films are more popular; feature/non-feature films have an outstanding split with regard to their audience scores; Longer movies generally bore the audience, etc.
+
+The current approach does not account for another layer of “prior” knowledge inside our brain -- the availability of different variables also impact their predictive power.
